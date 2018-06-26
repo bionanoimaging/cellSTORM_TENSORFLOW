@@ -1,0 +1,78 @@
+apply plugin: 'com.android.application'
+
+android {
+    compileSdkVersion 27
+    buildToolsVersion '27.0.3'
+
+    defaultConfig {
+        minSdkVersion 22
+        targetSdkVersion 27
+        versionCode 1
+        versionName "1.0"
+        //ndk {abiFilters "armeabi", "armeabi-v7a"}
+        multiDexEnabled true
+    }
+
+
+    // this option is necessary to leave the .pb model as is
+    aaptOptions {
+        noCompress 'pb'
+    }
+
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    lintOptions {
+        disable 'MissingTranslation'
+    }
+
+
+    sourceSets {
+        main {
+            jniLibs.srcDir '[jniLibs]' // i.e. 'libs'
+        }
+    }
+
+
+/*
+    externalNativeBuild {
+        ndkBuild {
+            path 'src/main/jni/Android.mk'
+        }
+    }
+*/
+}
+
+
+
+
+
+
+dependencies {
+    //compile 'com.github.wseemann:FFmpegMediaMetadataRetriever:1.0.14'
+
+    implementation "com.android.support:support-v4:27.0.2"
+    implementation "com.android.support:support-v13:27.0.2"
+    implementation "com.android.support:cardview-v7:27.0.2"
+    implementation "com.android.support:appcompat-v7:27.0.2"
+    implementation 'com.android.support:recyclerview-v7:27.0.2'
+    implementation 'com.android.support:design:27.0.2'
+
+
+    compile fileTree(dir: 'libs', include: ['*.jar'])
+    compile project(':openCVLibrary341')
+    compile 'org.apache.commons:commons-math3:3.6.1'
+    compile 'com.google.android.gms:play-services-appindexing:8.4.0'
+    compile files('src/main/libs/libandroid_tensorflow_inference_java.jar')
+
+    //compile 'com.github.wseemann:FFmpegMediaMetadataRetriever-armeabi:1.0.14'
+    //compile 'com.github.wseemann:FFmpegMediaMetadataRetriever-armeabi-v7a:1.0.14'
+    compile 'com.nononsenseapps:filepicker:3.0.0'
+}
+
+

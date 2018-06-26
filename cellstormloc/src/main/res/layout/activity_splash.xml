@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/black"
+    android:theme="@android:style/Theme.Holo.Light.NoActionBar">
+
+
+    <ImageView
+        android:id="@+id/imgLogo"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentStart="true"
+        android:layout_centerVertical="true"
+        android:layout_marginHorizontal="20dp"
+        android:layout_marginVertical="20dp"
+        android:adjustViewBounds="true"
+        android:minHeight="500dp"
+        android:minWidth="500dp"
+        android:scaleType="centerInside"
+        android:src="@drawable/logo_leibnizipht_negativ" />
+
+    <TextView
+        android:id="@+id/textView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/imgLogo"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="81dp"
+        android:fontFamily="sans-serif"
+        android:text="cellSTORM"
+        android:textColor="@color/WHITE"
+        android:textSize="30sp"
+        android:textStyle="italic" />
+
+    <TextView
+        android:id="@+id/textView2"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/textView"
+        android:layout_centerHorizontal="true"
+        android:fontFamily="sans-serif"
+        android:text="Heintzmann Nanoimaging Group"
+        android:textColor="@color/WHITE"
+        android:textSize="10sp"/>
+
+
+</RelativeLayout>

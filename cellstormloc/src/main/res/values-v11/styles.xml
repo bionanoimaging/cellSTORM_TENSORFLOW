@@ -1,0 +1,11 @@
+<resources>
+
+    <!--
+        Base applicatstyleheme for API 11+. Tstyleheme completely replaces
+        AppBaseTheme from res/values/styles.xml on API 11+ devices.
+    -->
+    <style name="AppBaseTheme" parent="android:Theme.Holo.Light">
+        <!-- APIstyleheme customizations can go here. -->
+    </style>
+
+</resources>
