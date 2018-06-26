@@ -1,6 +1,7 @@
 *.pb
 *.apk
 *.zip
+*/.DS_Store
 
 # Built application files
 *.apk
