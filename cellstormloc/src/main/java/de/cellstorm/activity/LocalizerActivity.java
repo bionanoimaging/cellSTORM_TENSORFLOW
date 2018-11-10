@@ -151,8 +151,8 @@ public class LocalizerActivity extends Activity {
         checkBoxDebug.setOnClickListener(checkboxClickListener);
         // Load native libraries
         //System.loadLibrary("native_microscope");
-        System.loadLibrary("opencv_java3");
         System.loadLibrary("tensorflow_inference");
+        System.loadLibrary("opencv_java3");
 
         // initialize Tensorflow object
         inferenceInterface = new TensorFlowInferenceInterface(getAssets(), MODEL_FILE);
