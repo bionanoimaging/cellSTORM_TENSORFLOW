@@ -15,6 +15,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.util.Log;
+import android.util.TimingLogger;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
@@ -63,7 +64,10 @@ public class LocalizerActivity extends Activity {
     boolean debug = false;
 
 
+
     String TAG = "TFcellSTORM";
+
+
     //********************************************************************************************** 
     // TENSORFLOW STUFF 
     // ********************************************************************************************** 
@@ -75,9 +79,12 @@ public class LocalizerActivity extends Activity {
     // String MODEL_FILE = "/storage/emulated/0/cellstorm/frozen_model.pb";
     String MODEL_FILE = "file:///android_asset/frozen_model.pb";
     //String MODEL_FILE = "file:///android_asset/first-graph.pb"; // name of python protobuffer file 
-    String INPUT_NODE = "Placeholder:0";                                // name of python input node  // prefix/
-    String OUTPUT_NODE = "outputs:0";                              // name of python output node 
-    long[] INPUT_SIZE = {1,256,256,1};                            // Size of input RGB image
+    //String INPUT_NODE = "Placeholder:0";                                // name of python input node  // prefix/
+    //String OUTPUT_NODE = "outputs:0";                              // name of python output node 
+    String INPUT_NODE = "inputs_tf:0";                                // name of python input node  // prefix/
+    String OUTPUT_NODE = "outputs:0";// name of python output node 
+    int batch_size = 6;
+    long[] INPUT_SIZE = {batch_size,256,256,1};                            // Size of input RGB image
     long[] OUTPUT_SIZE = {1,256,256,1};                            // Size of input RGB image
 
 
@@ -151,8 +158,8 @@ public class LocalizerActivity extends Activity {
         checkBoxDebug.setOnClickListener(checkboxClickListener);
         // Load native libraries
         //System.loadLibrary("native_microscope");
-        System.loadLibrary("tensorflow_inference");
         System.loadLibrary("opencv_java3");
+        System.loadLibrary("tensorflow_inference");
 
         // initialize Tensorflow object
         inferenceInterface = new TensorFlowInferenceInterface(getAssets(), MODEL_FILE);
@@ -297,13 +304,29 @@ public class LocalizerActivity extends Activity {
 
     private class runProcess extends AsyncTask<Void, Void, Void> {
 
+        long startTime = System.currentTimeMillis();
+        long diffTime = 0;
+        String messageTime = "";
 
+
+        void howLong(long mytime, String mymessage){
+            if(false){
+            startTime = System.currentTimeMillis();
+            messageTime = mymessage;
+            diffTime = Math.abs(startTime - mytime);
+            publishProgress();
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            startTime = System.currentTimeMillis();
+            }
+        }
 
         int iter = 0;
-        
 
-
-        @Override
+       @Override
         protected void onPreExecute() {
             super.onPreExecute();
         }
@@ -313,13 +336,18 @@ public class LocalizerActivity extends Activity {
             textViewIteration.setText("Processing frame: "+String.valueOf(iter+1)+"/"+String.valueOf(num_frames_iter-num_frame_first)+" @ "+"Touch coordinates (width/height): " +String.valueOf(center_w) + "x" + String.valueOf(center_h));
             imageViewCellstormResult.setImageBitmap(global_bitmap);
             //imageViewCellstormResult.setAdjustViewBounds(scaleType.centerInside);
+            Log.i(TAG, messageTime + " " + String.valueOf(diffTime)+ " ms");
         }
 
         @Override
             protected Void doInBackground(Void... params) {
 
+            // Setup the time logger for
+            TimingLogger timings = new TimingLogger("Timer", "doInBackground");
+
+
             // set parameters
-            Size dst_size = new Size(256, 256);
+            Size dst_size = new Size(OUTPUT_SIZE[1], OUTPUT_SIZE[2]);
             Size src_size = new Size(64, 64);
 
             // allocate memory/adress for MAT
@@ -328,6 +356,9 @@ public class LocalizerActivity extends Activity {
             Mat cellstorm_frame_result = new Mat();
             Mat cellstorm_frame_iter = Mat.zeros(dst_size, CvType.CV_8UC1);
 
+            List<Mat> listMat = new ArrayList<>();
+            int mycounter = 0;
+
             Mat cellstorm_sum_result = new Mat();
             Mat cellstorm_sum_result_brightfield = new Mat();
             cellstorm_sum_result = Mat.zeros(dst_size, CvType.CV_32FC1);
@@ -335,7 +366,7 @@ public class LocalizerActivity extends Activity {
 
             // define ouput Data to store result
             float[] TF_output;
-            float[] TF_input = new float[(int)(OUTPUT_SIZE[0]*OUTPUT_SIZE[1]*OUTPUT_SIZE[2]*OUTPUT_SIZE[3])];
+            float[] TF_input = new float[(int)(INPUT_SIZE[0]*INPUT_SIZE[1]*INPUT_SIZE[2]*INPUT_SIZE[3])];
 
             // Need to convert TestMat to float array to feed into TF
             MatOfFloat TF_input_f = new MatOfFloat(CvType.CV_32F);
@@ -348,13 +379,15 @@ public class LocalizerActivity extends Activity {
             Log.i(TAG, "VIDEO_Width/Height: "+String.valueOf(video_width)+"/"+String.valueOf(video_heigth)+", VIDEO_FRAMERATE: "+String.valueOf(video_framerate)+", VIDEO_DURATION (us): "+String.valueOf(video_duration*1000)+", VIDEO_FRAME_DURATION (us): "+String.valueOf(video_frame_duration));
 
             Log.i(TAG, "Start");
-            for(iter = num_frame_first; iter< num_frames_iter+num_frame_first; iter++) {
-
+            //for(iter = num_frame_first; iter< num_frames_iter+num_frame_first; iter++) {
+            for(iter = num_frame_first; iter<100; iter++) {
                 long video_time_position = (long)((float)iter*video_frame_duration);
                 Log.i(TAG, "Videoframe-position: "+String.valueOf(iter)+", Time: (us)"+String.valueOf(video_time_position));
 
+
                 // get first frame of the video
                 Bitmap current_frame = mediaMetadataRetriever.getFrameAtTime(video_time_position,  MediaMetadataRetriever.OPTION_CLOSEST_SYNC); //unit in microsecond
+                howLong(startTime, "Get Bitmap Frame from mediareader");
 
                 // Bitmap current_frame = mmr.getFrameAtTime(video_time_position, FFmpegMediaMetadataRetriever.OPTION_CLOSEST); // frame at XX museconds
 
@@ -365,9 +398,13 @@ public class LocalizerActivity extends Activity {
 
                 if(true){
                     Utils.bitmapToMat(current_frame, cellstorm_frame_raw);
+                    howLong(startTime, "BITMAP to Mat");
                     cvtColor(cellstorm_frame_raw , cellstorm_frame_raw , Imgproc.COLOR_RGB2GRAY);
+                    howLong(startTime, "Colorconversion");
                     Rect roi = new Rect(center_w, center_h, (int)src_size.width, (int)src_size.height);
                     cellstorm_frame = new Mat(cellstorm_frame_raw, roi);
+                    howLong(startTime, "Extract ROI");
+
                 }
                 else{ // only for debugging purposes
                     cellstorm_frame_raw = imread(image_path+"image.png", CV_LOAD_IMAGE_GRAYSCALE);
@@ -376,66 +413,89 @@ public class LocalizerActivity extends Activity {
                 // resize the image to designated size (256x256)
                 if(debug) imwriteNorm(cellstorm_frame, image_path+"image_orig"+String.valueOf(iter)+".png");
                 Imgproc.resize(cellstorm_frame, cellstorm_frame, dst_size);//, 0., 0., Imgproc.INTER_NEAREST);
-
+                howLong(startTime, "Normlization and Resizing");
 
 
                 // accumulate the result of all frames
                 cellstorm_frame.convertTo(cellstorm_frame, CvType.CV_32FC1);
                 Core.add(cellstorm_sum_result_brightfield, cellstorm_frame, cellstorm_sum_result_brightfield);
                 if(debug) imwriteNorm(cellstorm_frame, image_path+"image_orig_resize"+String.valueOf(iter)+".png");
-
+                howLong(startTime, "Convert and Sum images");
 
                 // preprocess the frame
                 cellstorm_frame = preprocess(cellstorm_frame);
+                howLong(startTime, "Preprocess image");
 
                 // convert MAT to MatOfFloat
                 cellstorm_frame.convertTo(TF_input_f,CvType.CV_32F);
 
-                // get the frame/image and allocate it in the MOF object
-                TF_input_f.get(0, 0, TF_input);
+                if(mycounter < batch_size) {
+                    mycounter ++;
 
-                // define ouput Data to store result
-                TF_output = new float[(int) (OUTPUT_SIZE[0]*OUTPUT_SIZE[1]*OUTPUT_SIZE[2]*OUTPUT_SIZE[3])];
+                    // First stack batch_size channels together for faster processing?!
+                    listMat.add(TF_input_f);
 
-                // feed the data to the input node
-                inferenceInterface.feed(INPUT_NODE, TF_input, INPUT_SIZE);
-                // run inference model in native code
-                inferenceInterface.run(new String[] {OUTPUT_NODE});
-                // fetch the result from the node
-                inferenceInterface.fetch(OUTPUT_NODE,TF_output);
-
-                if(debug) Log.i(TAG, " I processed the " + String.valueOf(iter) + "-th frame!");
-
-                // convert array-buffer back to MAT
-                TF_output_f.put(0, 0, TF_output);
-
-                // convert MAT to MatOfFloat
-                TF_output_f.convertTo(cellstorm_frame_result,CvType.CV_32F);
-                if(debug) Log.i(TAG, String.valueOf(cellstorm_frame_result));
-                if(debug) Log.i(TAG, String.valueOf(TF_output_f));
-                if(debug) Log.i(TAG, "Arraysize: "+ String.valueOf(TF_output.length));
-
-                // deprocess the MAT and save it
-                cellstorm_frame_result = deprocess(cellstorm_frame_result);
-                if(true) imwriteNorm(cellstorm_frame_result, image_path+"image_result"+String.valueOf(iter)+".png");
-
-                // accumulate the result of all frames
-                Core.add(cellstorm_sum_result, cellstorm_frame_result, cellstorm_sum_result);
-
-                // display result
-                if(debug){
-                    if ((iter%1) == 2) cellstorm_frame_result.copyTo(cellstorm_frame_iter);
-                    else cellstorm_frame.copyTo(cellstorm_frame_iter);
-
-                    normalize(cellstorm_frame_iter, cellstorm_frame_iter, 0, 255, NORM_MINMAX);
-                    cellstorm_frame_iter.convertTo(cellstorm_frame_iter, CvType.CV_8UC1);
-                    Log.i(TAG, String.valueOf(cellstorm_frame_iter));
-                    Utils.matToBitmap(cellstorm_frame_iter, cellSTORM_result);
-                    global_bitmap = cellSTORM_result;
-                    //cellstorm_frame_iter.release();
                 }
                 else{
-                    // display the summed resut every 10th iteration
+                    // If a stack of batch_size images is loaded, feed it into the TF object and run iference
+                    Mat tmp_dst = new Mat();
+                    Core.merge(listMat, tmp_dst);
+                    listMat.clear();
+                    Log.i(TAG, String.valueOf(tmp_dst));
+
+                    // define ouput Data to store result
+                    TF_output = new float[(int) (OUTPUT_SIZE[0]*OUTPUT_SIZE[1]*OUTPUT_SIZE[2]*OUTPUT_SIZE[3])];
+
+                    // get the frame/image and allocate it in the MOF object
+                    tmp_dst.get(0, 0, TF_input);
+
+                    // rest the counter again
+                    mycounter = 0;
+
+
+                    // feed the data to the input node
+                    inferenceInterface.feed(INPUT_NODE, TF_input, INPUT_SIZE);
+
+                    // run inference model in native code
+                    inferenceInterface.run(new String[] {OUTPUT_NODE});
+
+                    // fetch the result from the node
+                    inferenceInterface.fetch(OUTPUT_NODE,TF_output);
+
+                    if(debug) Log.i(TAG, " I processed the " + String.valueOf(iter) + "-th frame!");
+
+                    // convert array-buffer back to MAT
+                    TF_output_f.put(0, 0, TF_output);
+                    howLong(startTime, "Tensorflow to Float");
+
+                    // convert MAT to MatOfFloat
+                    TF_output_f.convertTo(cellstorm_frame_result,CvType.CV_32F);
+                    if(debug) Log.i(TAG, String.valueOf(cellstorm_frame_result));
+                    if(debug) Log.i(TAG, String.valueOf(TF_output_f));
+                    if(debug) Log.i(TAG, "Arraysize: "+ String.valueOf(TF_output.length));
+
+                    // deprocess the MAT and save it
+                    cellstorm_frame_result = deprocess(cellstorm_frame_result);
+                    if(true) imwriteNorm(cellstorm_frame_result, image_path+"image_result"+String.valueOf(iter)+".png");
+                    howLong(startTime, "Tensorflow deprocess");
+                    // accumulate the result of all frames
+                    Core.add(cellstorm_sum_result, cellstorm_frame_result, cellstorm_sum_result);
+                    howLong(startTime, "Tensorflow summing");
+
+                    // display result
+                    if(debug){
+                        if ((iter%1) == 2) cellstorm_frame_result.copyTo(cellstorm_frame_iter);
+                        else cellstorm_frame.copyTo(cellstorm_frame_iter);
+
+                        normalize(cellstorm_frame_iter, cellstorm_frame_iter, 0, 255, NORM_MINMAX);
+                        cellstorm_frame_iter.convertTo(cellstorm_frame_iter, CvType.CV_8UC1);
+                        Log.i(TAG, String.valueOf(cellstorm_frame_iter));
+                        Utils.matToBitmap(cellstorm_frame_iter, cellSTORM_result);
+                        global_bitmap = cellSTORM_result;
+                        //cellstorm_frame_iter.release();
+                    }
+                    else{
+                        // display the summed resut every 10th iteration
                         if ((iter%10) == 1) {
                             cellstorm_sum_result.copyTo(cellstorm_frame_iter);
                             normalize(cellstorm_frame_iter, cellstorm_frame_iter, 0, 255, NORM_MINMAX);
@@ -447,8 +507,12 @@ public class LocalizerActivity extends Activity {
                         // push the iteration result to the textview
 
                     }
+
+                }
+
                 publishProgress();
             }
+
 
             // write out the results of the summed frames (loc and BF)
             imwriteNorm(cellstorm_sum_result_brightfield, image_path+"cellstorm_BF_result.png");
